@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Medical Bill</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      font-size: 18px; /* Restore default font size */
+    }
+
+    .header {
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    .form-section {
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .form-left, .form-right {
+      width: 48%;
+    }
+
+    .form-section div {
+      margin-bottom: 10px;
+    }
+
+    /* Remove borders from input/select within PDF content */
+    #billContent input[type="text"],
+    #billContent input[type="number"],
+    #billContent select {
+      border: none;
+      background: transparent;
+      padding: 6px;
+      box-sizing: border-box;
+      outline: none;
+      font-size: inherit;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      table-layout: fixed;
+    }
+
+    col.description { width: 30%; }
+    col.qty { width: 7%; }
+    col.unit { width: 10%; }
+    col.mfg { width: 10%; }
+    col.exp { width: 10%; }
+    col.gst { width: 7%; }
+    col.dst { width: 5%; }
+    col.total { width: 8%; }
+    col.action { width: 0; }
+
+    th, td {
+      border: 1px solid #444;
+      padding: 6px;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: inherit; /* Use body font size */
+    }
+
+    th {
+      background-color: #f2f2f2;
+    }
+
+    tfoot td {
+      font-weight: bold;
+    }
+
+    .add-row-btn, .print-btn, .pdf-btn {
+      margin-top: 10px;
+      padding: 6px 12px;
+      font-size: inherit;
+      margin-right: 10px;
+    }
+
+    /* Hide action buttons and column when printing */
+    @media print {
+      .add-row-btn, .print-btn, .pdf-btn, .action-col {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="billContent">
+    <div class="header">Estimate</div>
+
+    <div class="form-section">
+      <div class="form-left">
+        <div><strong>Customer Name:</strong> <span id="textName">[Name]</span></div>
+        <div><strong>Mobile:</strong> <span id="textMobile">[Mobile]</span></div>
+        <div><strong>Address:</strong> <span id="textAddress">[Address]</span></div>
+      </div>
+      <div class="form-right">
+        <div><strong>Bill No:</strong> <span id="textBillNo">EST-2025-001</span></div>
+        <div><strong>Bill Date:</strong> <span id="textBillDate">07-Jun-2025</span></div>
+      </div>
+    </div>
+
+    <table id="billTable">
+      <colgroup>
+        <col class="description">
+        <col class="qty">
+        <col class="unit">
+        <col class="mfg">
+        <col class="exp">
+        <col class="gst">
+        <col class="dst">
+        <col class="total">
+        <col class="action">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Qty</th>
+          <th>Unit</th>
+          <th>Mfg</th>
+          <th>Exp</th>
+          <th>GST (%)</th>
+          <th>Dst (%)</th>
+          <th>Total</th>
+          <th class="action-col">Action</th>
+        </tr>
+      </thead>
+      <tbody id="billBody"></tbody>
+      <tfoot>
+        <tr>
+          <td colspan="7">Grand Total</td>
+          <td id="grandTotal">₹0.00</td>
+          <td class="action-col"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div style="margin-top:20px;">
+    <button class="add-row-btn" onclick="addRow()">Add Item</button>
+    <button class="print-btn" onclick="window.print()">Print</button>
+    <button class="pdf-btn" onclick="downloadPDF()">Download PDF</button>
+  </div>
+
+  <script>
+    function syncText() {
+      document.getElementById('textName').innerText = document.getElementById('customerName')?.value || '';
+      document.getElementById('textMobile').innerText = document.getElementById('mobile')?.value || '';
+      document.getElementById('textAddress').innerText = document.getElementById('address')?.value || '';
+      document.getElementById('textBillNo').innerText = document.getElementById('billNo')?.value || '';
+      document.getElementById('textBillDate').innerText = document.getElementById('billDate')?.value || '';
+    }
+
+    window.onload = function() {
+      const formSec = document.createElement('div');
+      formSec.innerHTML = `
+        <div class="form-section">
+          <div class="form-left">
+            <div><label>Customer Name:<input type="text" id="customerName" value=""></label></div>
+            <div><label>Mobile:<input type="text" id="mobile" value=""></label></div>
+            <div><label>Address:<input type="text" id="address" value=""></label></div>
+          </div>
+          <div class="form-right">
+            <div><label>Bill No:<input type="text" id="billNo" value="EST-2025-001"></label></div>
+            <div><label>Bill Date:<input type="date" id="billDate" value="2025-06-07"></label></div>
+          </div>
+        </div>
+      `;
+      document.body.insertBefore(formSec, document.getElementById('billContent'));
+      addRow();
+    };
+
+    function addRow() {
+      const tbody = document.getElementById('billBody');
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><input type="text" onchange="updateTotal(this)"></td>
+        <td><input type="number" value="1" onchange="updateTotal(this)"></td>
+        <td><input type="number" value="0" onchange="updateTotal(this)"></td>
+        <td><input type="text" onchange="updateTotal(this)"></td>
+        <td><input type="text" onchange="updateTotal(this)"></td>
+        <td><select onchange="updateTotal(this)"><option value="12" selected>12%</option><option value="18">18%</option></select></td>
+        <td><input type="number" value="0" onchange="updateTotal(this)"></td>
+        <td class="rowTotal">₹0.00</td>
+        <td class="action-col"><button onclick="removeRow(this)">🗑️</button></td>
+      `;
+      tbody.appendChild(row);
+    }
+
+    function removeRow(button) { button.closest('tr').remove(); updateGrandTotal(); }
+
+    function updateTotal(input) {
+      syncText();
+      const row = input.closest('tr');
+      const qty = parseFloat(row.cells[1].querySelector('input').value) || 0;
+      const unit = parseFloat(row.cells[2].querySelector('input').value) || 0;
+      const gst = parseFloat(row.cells[5].querySelector('select').value) || 0;
+      const dst = parseFloat(row.cells[6].querySelector('input').value) || 0;
+      const baseAmount = qty * unit;
+      const gstAmount = baseAmount * gst/100;
+      const totalBeforeDiscount = baseAmount + gstAmount;
+      const discountAmount = totalBeforeDiscount * dst/100;
+      const finalTotal = totalBeforeDiscount - discountAmount;
+      row.cells[7].innerText = `₹${finalTotal.toFixed(2)}`;
+      updateGrandTotal();
+    }
+
+    function updateGrandTotal() {
+      let grand = 0;
+      document.querySelectorAll('.rowTotal').forEach(c => grand += parseFloat(c.innerText.replace('₹',''))||0);
+      document.getElementById('grandTotal').innerText = `₹${grand.toFixed(2)}`;
+    }
+
+    function downloadPDF() {
+      syncText();
+      document.querySelectorAll('.action-col').forEach(el => el.style.display='none');
+      html2canvas(document.querySelector('#billContent')).then(canvas => {
+        const img = canvas.toDataURL('image/png');
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const w = doc.internal.pageSize.getWidth();
+        const h = (canvas.height * w) / canvas.width;
+        doc.addImage(img, 'PNG', 0, 0, w, h);
+        const filename = document.getElementById('textBillNo').innerText.trim() || 'bill';
+        doc.save(`${filename}.pdf`);
+        document.querySelectorAll('.action-col').forEach(el => el.style.display='');
+      });
+    }
+  </script>
+
+</body>
+</html>
