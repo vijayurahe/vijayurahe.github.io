@@ -1,3 +1,4 @@
+
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
 <html lang="en">
 <head>
@@ -18,6 +19,7 @@
       font-weight: bold;
       text-transform: uppercase;
       margin-bottom: 20px;
+      margin-top: 30px;
     }
 
     .form-section {
@@ -101,7 +103,7 @@
 </head>
 <body>
 
-  <div id="billContent">
+  <div id="billContent" style="padding-top: 30px; padding-left: 40px; padding-right: 35px;">
     <div class="header">Estimate</div>
 
     <div class="form-section">
@@ -152,10 +154,13 @@
     </table>
   </div>
 
+
   <div style="margin-top:20px;">
     <button class="add-row-btn" onclick="addRow()">Add Item</button>
     <button class="print-btn" onclick="window.print()">Print</button>
     <button class="pdf-btn" onclick="downloadPDF()">Download PDF</button>
+    <button class="pdf-btn" onclick="downloadPng()">Download Image</button>
+    
   </div>
 
   <script>
@@ -225,6 +230,30 @@
       let grand = 0;
       document.querySelectorAll('.rowTotal').forEach(c => grand += parseFloat(c.innerText.replace('₹',''))||0);
       document.getElementById('grandTotal').innerText = `₹${grand.toFixed(2)}`;
+    }
+
+	function downloadPng() {
+	    syncText();
+	  // hide action buttons
+	  document.querySelectorAll('.action-col').forEach(el => el.style.display = 'none');
+
+	  html2canvas(document.querySelector('#billContent')).then(canvas => {
+	    // restore action buttons immediately (so they reappear in the DOM)
+	    document.querySelectorAll('.action-col').forEach(el => el.style.display = '');
+
+	    // convert canvas to blob and trigger download
+	    canvas.toBlob(blob => {
+	      const filename = (document.getElementById('textBillNo').innerText.trim() || 'bill') + '.png';
+	      const link = document.createElement('a');
+	      link.href = URL.createObjectURL(blob);
+	      link.download = filename;
+	      document.body.appendChild(link);
+	      link.click();
+	      document.body.removeChild(link);
+	      // revoke object URL after download
+	      setTimeout(() => URL.revokeObjectURL(link.href), 100);
+	    }, 'image/png');
+	  	});
     }
 
     function downloadPDF() {
